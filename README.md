@@ -53,6 +53,13 @@
 
 [Data](docs/DATA.md) | [Training](docs/TRAINING.md) | [Evaluation](docs/EVALUATION.md) | [Method notes](docs/METHOD.md)
 
+## Fork note: N camera views (`nview` branch)
+
+This fork generalizes the upstream three-camera requirement. `grbc-export --cameras`
+accepts any number of view keys (e.g. SO-101 `front wrist`), `min_camera_hits`
+defaults to "all provided views" (the paper's all-view rule), and the MCR feature
+cache validates against `2048 * len(cameras)`. See `tests/grbc/test_nview.py`.
+
 ## To-do List
 
 - [x] Release graph weighting and progress visualization.
