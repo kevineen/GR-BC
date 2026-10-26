@@ -4,7 +4,7 @@
   "mutual_k": 20,
   "adaptive_edge_alpha": 1.0,
   "adaptive_base_scale": 0.05,
-  "min_camera_hits": 3,
+  "min_camera_hits": null,
   "sim_cost_scale": 1.0,
   "chunk": 30,
   "n_action_step": 30,

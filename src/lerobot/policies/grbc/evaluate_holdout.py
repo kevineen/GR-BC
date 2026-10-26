@@ -11,12 +11,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import GraphConfig
+from .config import GraphConfig, resolve_min_camera_hits
 from .dataset import history_rows
 from .graph import build_multi_view_adaptive_similarity_edges, build_temporal_edges, reverse_dijkstra
 
 
-def similarity_for(features, nodes, config):
+def similarity_for(features, nodes, config, camera_count=3):
     edges, _ = build_multi_view_adaptive_similarity_edges(
         features,
         nodes,
@@ -26,10 +26,10 @@ def similarity_for(features, nodes, config):
         config.adaptive_edge_alpha,
         config.adaptive_base_scale,
         config.sim_cost_scale,
-        camera_count=3,
+        camera_count=camera_count,
         node_to_rows=history_rows(nodes, config.history),
         history=config.history,
-        min_camera_hits=config.min_camera_hits,
+        min_camera_hits=resolve_min_camera_hits(config.min_camera_hits, camera_count),
     )
     if config.cross_trajectory_only:
         ep = nodes.episode_index.to_numpy()
@@ -37,7 +37,7 @@ def similarity_for(features, nodes, config):
     return edges
 
 
-def evaluate(nodes, features, config, base_episodes, query_episodes):
+def evaluate(nodes, features, config, base_episodes, query_episodes, camera_count=3):
     base_episodes, query_episodes = set(base_episodes), set(query_episodes)
     if not base_episodes or not query_episodes or base_episodes & query_episodes:
         raise ValueError("Supply nonempty, disjoint base/query episode splits")
@@ -51,7 +51,7 @@ def evaluate(nodes, features, config, base_episodes, query_episodes):
     base.node_id = np.arange(len(base))
     base_features = features[base_mask]
     temporal = build_temporal_edges(base)
-    similarity = similarity_for(base_features, base, config)
+    similarity = similarity_for(base_features, base, config, camera_count)
     goals = set(base.loc[base.next_reward > 0, "node_id"].astype(int))
     raw, _, _ = reverse_dijkstra(len(base), temporal, similarity, goals)
     rmax = max(float(np.quantile(raw[np.isfinite(raw)], config.rmax_quantile)), 1e-8)
@@ -74,7 +74,7 @@ def evaluate(nodes, features, config, base_episodes, query_episodes):
         combined = pd.concat([base, query], ignore_index=True)
         combined.node_id = np.arange(len(combined))
         combined_features = np.concatenate([base_features, query_features])
-        candidate = similarity_for(combined_features, combined, config)
+        candidate = similarity_for(combined_features, combined, config, camera_count)
         additions = [edge for edge in candidate if edge[0] >= len(base) or edge[1] >= len(base)]
         query_temporal = build_temporal_edges(combined.iloc[len(base) :])
         distances, _, _ = reverse_dijkstra(
@@ -126,7 +126,10 @@ def main():
     config.validate()
     nodes = pd.read_parquet(args.run / "nodes.parquet")
     features = np.load(args.run / "layout_features.npy", allow_pickle=False)
-    values, records, base = evaluate(nodes, features, config, args.base_episodes, args.query_episodes)
+    camera_count = len(summary.get("cameras")) if summary.get("cameras") else 3
+    values, records, base = evaluate(
+        nodes, features, config, args.base_episodes, args.query_episodes, camera_count
+    )
     args.output_dir.mkdir(parents=True)
     values.to_parquet(args.output_dir / "heldout_node_progress.parquet", index=False)
     result = {

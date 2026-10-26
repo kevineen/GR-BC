@@ -12,7 +12,7 @@ class GraphConfig:
     adaptive_edge_alpha: float = 1.0
     adaptive_base_scale: float = 0.0001
     sim_cost_scale: float = 1.0
-    min_camera_hits: int = 3
+    min_camera_hits: int | None = None
     chunk: int = 30
     n_action_step: int = 30
     progress_dip_tolerance: float = 0.03
@@ -41,8 +41,10 @@ class GraphConfig:
             raise ValueError("history must be a nonnegative integer")
         if self.n_action_step > self.chunk:
             raise ValueError("n_action_step must not exceed chunk")
-        if not 1 <= self.min_camera_hits <= 3 or not 0 < self.rmax_quantile <= 1:
-            raise ValueError("Invalid camera hits or Rmax quantile")
+        if self.min_camera_hits is not None and self.min_camera_hits < 1:
+            raise ValueError("min_camera_hits must be a positive integer or None (all cameras)")
+        if not 0 < self.rmax_quantile <= 1:
+            raise ValueError("Invalid Rmax quantile")
         for name in ("adaptive_edge_alpha", "adaptive_base_scale", "sim_cost_scale", "weight_gamma"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
@@ -74,3 +76,11 @@ PRESETS = {
         "interpolation": "legacy",
     },
 }
+
+
+def resolve_min_camera_hits(min_camera_hits, camera_count):
+    """None means require every camera view to agree (the paper's three-view rule)."""
+    value = camera_count if min_camera_hits is None else int(min_camera_hits)
+    if not 1 <= value <= camera_count:
+        raise ValueError(f"min_camera_hits must be in [1, {camera_count}], got {min_camera_hits}")
+    return value

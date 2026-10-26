@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import PRESETS, GraphConfig
+from .config import PRESETS, GraphConfig, resolve_min_camera_hits
 from .dataset import CAMERAS, dataset_fingerprint, history_rows, load_dataset, sample_nodes, table_identity
 from .encoder import extract_features
 from .graph import build_multi_view_adaptive_similarity_edges, build_temporal_edges, reverse_dijkstra
@@ -28,6 +28,10 @@ def run(
     selected=None,
 ):
     config.validate()
+    cameras = list(cameras)
+    if not cameras or len(set(cameras)) != len(cameras):
+        raise ValueError("Provide at least one unique camera feature key")
+    min_camera_hits = resolve_min_camera_hits(config.min_camera_hits, len(cameras))
     output = Path(output)
     if (output / "summary.json").exists() or (output / "transition_weights.parquet").exists():
         raise FileExistsError("Choose a fresh output directory; completed runs are not overwritten")
@@ -59,10 +63,10 @@ def run(
         config.adaptive_edge_alpha,
         config.adaptive_base_scale,
         config.sim_cost_scale,
-        camera_count=3,
+        camera_count=len(cameras),
         node_to_rows=mapping,
         history=config.history,
-        min_camera_hits=config.min_camera_hits,
+        min_camera_hits=min_camera_hits,
     )
     if config.cross_trajectory_only:
         ep = nodes.episode_index.to_numpy()
@@ -143,7 +147,7 @@ def main():
     parser.add_argument("--reuse-cache", action="store_true")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--batch-size-mcr", type=int, default=48)
-    parser.add_argument("--cameras", nargs=3, default=CAMERAS)
+    parser.add_argument("--cameras", nargs="+", default=CAMERAS, help="camera feature keys, any count")
     parser.add_argument("--selected-episodes", nargs="+", type=int)
     defaults = GraphConfig()
     for field in fields(GraphConfig):

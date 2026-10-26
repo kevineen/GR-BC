@@ -40,7 +40,7 @@ def extract_features(
     path = cache / f"mcr_{signature}.npy"
     if reuse and path.exists():
         features = np.load(path, allow_pickle=False)
-        if features.shape != (len(nodes), 6144) or not np.isfinite(features).all():
+        if features.shape != (len(nodes), 2048 * len(cameras)) or not np.isfinite(features).all():
             raise ValueError("Incomplete or invalid feature cache")
         return features, {
             "cache_hit": True,
